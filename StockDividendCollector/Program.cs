@@ -5,14 +5,22 @@ using System.Linq;
 using System.Collections.Generic;
 using System.Globalization;
 
+#nullable enable
+
 namespace StockDividendCollector
 {
     class Program
     {
         static void Main(string[] args)
         {
-            Console.WriteLine("Enter the stock symbol (e.g., MSFT):");
-            string stockSymbol = Console.ReadLine();
+            Console.WriteLine("Enter the stock symbol (e.g., 2330):");
+            string? stockSymbol = Console.ReadLine();
+
+            if (string.IsNullOrWhiteSpace(stockSymbol))
+            {
+                Console.WriteLine("Stock symbol cannot be empty.");
+                return;
+            }
 
             int year;
             while (true)
@@ -28,31 +36,72 @@ namespace StockDividendCollector
                 }
             }
 
-            Console.WriteLine($"Getting dividend information for {stockSymbol} in {year}...");
+            string chineseName = GetStockChineseName(stockSymbol);
+            Console.WriteLine($"Getting dividend information for {stockSymbol} ({chineseName}) in {year}...");
 
             var dividendData = GetDividendData(stockSymbol, year);
 
-            if (dividendData.Any())
+            var stockInfo = new StockInfo
+            {
+                Symbol = stockSymbol,
+                ChineseName = chineseName,
+                Dividends = dividendData
+            };
+
+            if (stockInfo.Dividends.Any())
             {
                 Console.WriteLine("Dividend Data:");
-                foreach (var dividend in dividendData)
+                foreach (var dividend in stockInfo.Dividends)
                 {
                     Console.WriteLine($"Date: {dividend.Date.ToShortDateString()}, Dividend: {dividend.DividendAmount}");
                 }
             }
             else
             {
-                Console.WriteLine($"No dividend data found for {stockSymbol} in {year}.");
+                Console.WriteLine($"No dividend data found for {stockSymbol} ({stockInfo.ChineseName}) in {year}.");
             }
         }
+
+        static string GetStockChineseName(string stockSymbol)
+        {
+            try
+            {
+                var url = $"https://goodinfo.tw/tw/StockInfo.asp?stock_id={stockSymbol}";
+                var web = new HtmlWeb();
+                var doc = web.Load(url);
+
+                var titleNode = doc.DocumentNode.SelectSingleNode("//title");
+                if (titleNode != null)
+                {
+                    string titleText = titleNode.InnerText;
+                    // The format is usually "STOCK_ID STOCK_NAME - Goodinfo! Taiwan Stock Information"
+                    var parts = titleText.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+                    if (parts.Length > 1)
+                    {
+                        // The name is typically the second part, right after the stock symbol.
+                        return parts[1];
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                // If any error occurs (e.g., network issue, parsing error), return a default message.
+                Console.WriteLine($"Could not retrieve Chinese name for {stockSymbol}: {ex.Message}");
+            }
+
+            return "N/A";
+        }
+
 
         static List<Dividend> GetDividendData(string stockSymbol, int year)
         {
             var dividends = new List<Dividend>();
-            var url = $"https://finance.yahoo.com/quote/{stockSymbol}/history?period1={GetUnixTimestamp(new DateTime(year, 1, 1))}&period2={GetUnixTimestamp(new DateTime(year, 12, 31))}&interval=1d&filter=div&frequency=1d";
+            // Adjust the symbol for Yahoo Finance if it's a Taiwanese stock
+            string yahooSymbol = stockSymbol.EndsWith(".TW") ? stockSymbol : $"{stockSymbol}.TW";
+            var url = $"https://finance.yahoo.com/quote/{yahooSymbol}/history?period1={GetUnixTimestamp(new DateTime(year, 1, 1))}&period2={GetUnixTimestamp(new DateTime(year, 12, 31))}&interval=1d&filter=div&frequency=1d";
             
             var web = new HtmlWeb();
-            HtmlDocument doc = null;
+            HtmlDocument? doc = null;
             try
             {
                 doc = web.Load(url);
@@ -82,11 +131,9 @@ namespace StockDividendCollector
                     foreach (var row in rows)
                     {
                         var cells = row.SelectNodes(".//td").ToList();
-                        // Yahoo Finance often has an extra row for "Dividend" which can be identified by "Dividend" in the second column
                         if (cells.Count > 1 && cells[1].InnerText.Contains("Dividend"))
                         {
                             var dateText = cells[0].InnerText;
-                            // The dividend amount is usually the first part of the text, e.g., "0.71 Dividend"
                             var dividendText = cells[1].InnerText.Split(' ')[0];
 
                             if (DateTime.TryParse(dateText, out DateTime date) && decimal.TryParse(dividendText, NumberStyles.Any, CultureInfo.InvariantCulture, out decimal dividendAmount))
@@ -104,6 +151,13 @@ namespace StockDividendCollector
         {
             return (long)(date.ToUniversalTime() - new DateTime(1970, 1, 1)).TotalSeconds;
         }
+    }
+
+    public class StockInfo
+    {
+        public string Symbol { get; set; } = string.Empty;
+        public string ChineseName { get; set; } = string.Empty;
+        public List<Dividend> Dividends { get; set; } = new List<Dividend>();
     }
 
     public class Dividend
