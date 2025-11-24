@@ -1,52 +1,63 @@
 # Stock Dividend Collector
 
-This project contains a Python script to fetch and display historical stock dividend information from Yahoo Finance.
+A Python script to fetch, calculate, and display stock dividend information, including the latest price and yield, in a clean, formatted table.
 
-## `chatgpt_stock_dividend_collect.py`
+## Features
 
-### Purpose
+- Fetches historical cash dividend data from Yahoo Finance for a given year.
+- Retrieves the latest stock price and its trading date.
+- Calculates the annual dividend yield.
+- Uses a local `stock_list.txt` file to map stock codes to their Chinese names.
+- Displays the final summary in a well-organized, aligned table.
 
-This script is a command-line tool for retrieving cash dividend data for Taiwanese stocks for a specified year.
+## Prerequisites
 
-### How to Use
+- Python 3.x
+- The `requests` library. Install it via pip:
+  ```bash
+  pip install requests
+  ```
 
-1.  **Prerequisites:**
-    *   You must have Python installed on your system.
-    *   You need to install the `requests` library:
-        ```bash
-        pip install requests
-        ```
+## Setup
 
-2.  **Run the script:**
-    *   Open a terminal or command prompt.
-    *   Navigate to the directory containing the script:
-        ```bash
-        cd C:\Users\DONACHEN\source\repos\STOCK_DIVIDEND_COLLECT\StockDividendCollector
-        ```
-    *   Execute the script using Python:
-        ```bash
-        python chatgpt_stock_dividend_collect.py
-        ```
+### `stock_list.txt`
 
-3.  **Follow the prompts:**
-    *   The script will first ask you to enter one or more stock codes. These must be valid Taiwanese stock tickers ending in `.TW` or `.TWO` (for OTC stocks). Separate multiple codes with a space.
-        > **Enter stock codes (e.g., 2330.TW 8406.TWO):**
-    *   Next, it will ask for the year you are interested in.
-        > **Enter the year (e.g., 2023):**
+Before running the script, you must create a `stock_list.txt` file in the same directory as the script (`StockDividendCollector/`). This file is used to look up the Chinese name for each stock code.
 
-### Expected Outcome
+The format for each line is:
+`[Chinese Name] [Stock Code]`
 
-After you provide the inputs, the script will contact Yahoo Finance and print the dividend information for each stock.
+**Example `stock_list.txt`:**
+```
+中信金 2891.TW
+國泰永續高股息 00878.TW
+台積電 2330.TW
+```
 
-**Example Output:**
+## How to Use
+
+This is a command-line tool. Run it from your terminal and provide the stock codes and the year as arguments.
+
+- Navigate to the project's root directory.
+- Use the `-s` or `--stocks` flag to provide one or more stock codes (separated by spaces).
+- Use the `-y` or `--year` flag to specify the year.
+
+**Example Command:**
+```bash
+python StockDividendCollector/chatgpt_stock_dividend_collect.py -s 2891.TW 00878.TW -y 2023
+```
+
+## Example Output
+
+The script will process the stocks and display a summary table like this:
 
 ```
---- Dividend information for 2330.TW in 2023 ---
-Dividend Date: 2023-03-22, Dividend: 2.75
-Dividend Date: 2023-06-21, Dividend: 2.75
-Dividend Date: 2023-09-20, Dividend: 3.0
-Dividend Date: 2023-12-20, Dividend: 3.0
-
-Summary for 2330.TW in 2023:
-Total Dividends: 11.5
+===== Dividend Summary =====
+Stock     Name            Price (2025-11-24)  Dividend  Yield
+-------------------------------------------------------------
+2891.TW   中信金                       44.10      1.00   2.27%
+00878.TW  國泰永續高股息               20.56      1.24   6.03%
+============================
 ```
+
+*(Note: The Chinese names may appear garbled in some terminals that do not fully support UTF-8 display.)*
