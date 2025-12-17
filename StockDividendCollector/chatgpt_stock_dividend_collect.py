@@ -175,7 +175,7 @@ def generate_yield_chart(summary, year):
     
     chart_data = {}
     max_yield = 0.0
-    for stock, (total, name, price, price_date, shares, price_change) in summary.items():
+    for stock, (total, name, price, price_date, shares, price_change, _, _, _) in summary.items(): # Added placeholders
         yield_val = 0.0
         if total > 0 and price is not None and price > 0:
             yield_val = (total / price) * 100
@@ -227,7 +227,7 @@ def generate_combined_performance_chart(summary, year):
                  
     chart_data = {}
     max_combined_performance = 0.0
-    for stock, (total, name, price, price_date, shares, price_change) in summary.items():
+    for stock, (total, name, price, price_date, shares, price_change, _, _, _) in summary.items(): # Added placeholders
         yield_val = 0.0
         if total > 0 and price is not None and price > 0:
             yield_val = (total / price) * 100
@@ -285,7 +285,7 @@ def generate_subtracted_performance_chart(summary, year):
                   
     chart_data = {}
     max_subtracted_performance = 0.0
-    for stock, (total, name, price, price_date, shares, price_change) in summary.items():
+    for stock, (total, name, price, price_date, shares, price_change, _, _, _) in summary.items(): # Added placeholders
         yield_val = 0.0
         if total > 0 and price is not None and price > 0:
             yield_val = (total / price) * 100
@@ -343,6 +343,9 @@ def main(args):
     final_stock_codes_to_process = []
     stock_names_from_input_file = {}
     shares_map = {}
+    bought_price_map = {}
+    low_rate_threshold_map = {} # Renamed for clarity
+    high_rate_threshold_map = {} # Renamed for clarity
 
     # Load master Chinese names from the local file (stock_list.txt)
     script_dir = os.path.dirname(os.path.realpath(__file__))
@@ -355,37 +358,64 @@ def main(args):
             with open(input_file_path, 'r', encoding='utf-8') as f:
                 for line in f:
                     line = line.strip()
-                    if not line:
+                    if not line or line.startswith('#'):
                         continue
                     
                     parts = line.replace('　', ' ').split()
                     identified_stock_code = None
-                    identified_name_parts = []
-                    identified_shares = None
                     
-                    remaining_parts = []
-                    # First, find the stock code
+                    # Find the stock code first
                     for part in parts:
                         if '.' in part and (part.endswith('.TW') or part.endswith('.TWO')):
                             identified_stock_code = part
-                        else:
-                            remaining_parts.append(part)
+                            break
                     
                     if identified_stock_code:
                         final_stock_codes_to_process.append(identified_stock_code)
-                        # Second, find shares in the remaining parts
-                        # What's left could be name or shares. Assume the integer is shares.
-                        for part in remaining_parts[:]: # Iterate over a copy
-                            if part.isdigit():
-                                identified_shares = int(part)
-                                remaining_parts.remove(part) # Remove shares part
                         
-                        if identified_shares is not None:
-                            shares_map[identified_stock_code] = identified_shares
+                        # Process all other parts
+                        name_parts = []
+                        numeric_parts = []
+                        for part in parts:
+                            if part == identified_stock_code:
+                                continue
+                            part = part.replace(',', '').strip()
+                            if not part: continue
+
+                            try:
+                                numeric_parts.append(float(part))
+                            except ValueError:
+                                name_parts.append(part)
+
+                        if name_parts:
+                            stock_names_from_input_file[identified_stock_code] = ' '.join(name_parts).replace('"', '')
+
+                        # Correctly assign numeric parts
+                        shares_val, bought_price_val, thresh1, thresh2 = None, None, None, None
+                        temp_numerics = list(numeric_parts)
+
+                        # Find shares (must be an integer, assumes one per line)
+                        for num in temp_numerics:
+                            if num == int(num):
+                                shares_val = int(num)
+                                temp_numerics.remove(num)
+                                break
                         
-                        # Whatever is left is the name
-                        if remaining_parts:
-                            stock_names_from_input_file[identified_stock_code] = ' '.join(remaining_parts).strip().replace('"', '')
+                        # Assign remaining floats
+                        if temp_numerics: bought_price_val = temp_numerics.pop(0)
+                        if temp_numerics: thresh1 = temp_numerics.pop(0)
+                        if temp_numerics: thresh2 = temp_numerics.pop(0)
+
+                        if shares_val is not None: shares_map[identified_stock_code] = shares_val
+                        if bought_price_val is not None: bought_price_map[identified_stock_code] = bought_price_val
+                        
+                        # Correctly assign high and low thresholds
+                        if thresh1 is not None and thresh2 is not None:
+                            high_rate_threshold_map[identified_stock_code] = max(thresh1, thresh2)
+                            low_rate_threshold_map[identified_stock_code] = min(thresh1, thresh2)
+                        elif thresh1 is not None:
+                            if thresh1 > 0: high_rate_threshold_map[identified_stock_code] = thresh1
+                            else: low_rate_threshold_map[identified_stock_code] = thresh1
                     else:
                         print(f"Warning: Skipping line in input file, no valid stock code found: {line}")
                         
@@ -396,28 +426,28 @@ def main(args):
             print(f"Error reading input file {input_file_path}: {e}")
             return
     elif stock_list_from_args:
-        # Otherwise, use codes from command line arguments
         final_stock_codes_to_process = stock_list_from_args
     
-    # Merge names: names from input_file take precedence over master_stock_names_map
     final_stock_names_map = master_stock_names_map.copy()
     final_stock_names_map.update(stock_names_from_input_file)
 
     for stock_code in final_stock_codes_to_process:
         print(f"Processing {stock_code}...")
-        # Validate stock code format
         if '.' not in stock_code:
             print(f"Invalid format: {stock_code}. Must include '.' like 2330.TW or 00772B.TWO")
             continue
         
-        # Look up the Chinese name from the final_stock_names_map
         chinese_name = final_stock_names_map.get(stock_code, "N/A")
-        shares = shares_map.get(stock_code) # Get shares, will be None if not found
+        shares = shares_map.get(stock_code)
+        bought_price = bought_price_map.get(stock_code)
+        low_rate_threshold = low_rate_threshold_map.get(stock_code)
+        high_rate_threshold = high_rate_threshold_map.get(stock_code)
         
         dividends, total = fetch_dividend_yahoo(stock_code, year)
         price, price_date = get_latest_price_yahoo(stock_code)
         price_change = get_price_change_yahoo(stock_code, year)
-        summary[stock_code] = (total, chinese_name, price, price_date, shares, price_change)
+        
+        summary[stock_code] = (total, chinese_name, price, price_date, shares, price_change, bought_price, low_rate_threshold, high_rate_threshold)
 
         if dividends:
             print(f"\nDividend info for stock {stock_code} ({chinese_name}) in {year}:")
@@ -425,26 +455,28 @@ def main(args):
                 print(f"Date: {d['Date']}, Cash Dividend: {d['Amount']:.2f}")
             print(f"Total Dividend for {stock_code} in {year}: {total:.2f}\n")
 
-    # --- Start of new summary printing logic ---
     if summary:
         print(f"\n=== Dividend Summary ({year}) ===")
                     
-        # Find the price date for the header from the first available entry
         price_header_date = ""
-        for _, _, _, p_date, _, _ in summary.values():
+        for _, _, _, p_date, _, _, _, _, _ in summary.values():
             if p_date and p_date != "N/A":
                 price_header_date = p_date
                 break
         
         price_header_text = f"Price ({price_header_date})" if price_header_date else "Price"
 
-        # Prepare data and calculate max widths
-        header_data = {"stock": "Stock", "name": "Name", "price": price_header_text, "dividend": "Dividend", "yield": "Yield", "shares": "Shares", "total_value": "Total Value"}
+        header_data = {
+            "stock": "Stock", "name": "Name", "price": price_header_text, 
+            "dividend": "Dividend", "yield": "Yield", "shares": "Shares", 
+            "total_value": "Total Value", "net_pl": "P/L", "percent_pl": "P/L %",
+            "signal": "Signal"
+        }
         print_data = [header_data]
         
         max_widths = {key: str_display_width(value) for key, value in header_data.items()}
 
-        for stock, (total, name, price, price_date, shares, price_change) in summary.items():
+        for stock, (total, name, price, price_date, shares, price_change, bought_price, low_rate_threshold, high_rate_threshold) in summary.items():
             price_str = f"{price:.2f}" if price is not None else "N/A"
             dividend_str = f"{total:.2f}"
             yield_str = "N/A"
@@ -458,15 +490,33 @@ def main(args):
                 total_value = total * shares
                 total_value_str = f"{total_value:,.2f}"
 
+            net_pl_str = "N/A"
+            percent_pl_str = "N/A"
+            percent_pl = None
+            if bought_price is not None and price is not None and shares is not None:
+                net_pl = (price - bought_price) * shares
+                net_pl_str = f"{net_pl:,.2f}"
+                if bought_price > 0:
+                    percent_pl = ((price - bought_price) / bought_price) * 100
+                    percent_pl_str = f"{percent_pl:+.2f}%"
+            
+            signal_str = ""
+            if percent_pl is not None:
+                if high_rate_threshold is not None and percent_pl >= high_rate_threshold:
+                    signal_str = "Take-Profit"
+                elif low_rate_threshold is not None and percent_pl <= low_rate_threshold:
+                    signal_str = "Cut-Loss"
 
-            row = {"stock": stock, "name": name, "price": price_str, "dividend": dividend_str, "yield": yield_str, "shares": shares_str, "total_value": total_value_str}
+            row = {
+                "stock": stock, "name": name, "price": price_str, "dividend": dividend_str, 
+                "yield": yield_str, "shares": shares_str, "total_value": total_value_str,
+                "net_pl": net_pl_str, "percent_pl": percent_pl_str, "signal": signal_str
+            }
             print_data.append(row)
 
             for key, value in row.items():
-                # We use the header key for max_widths, as 'price' header is dynamic
-                max_widths[key] = max(max_widths[key], str_display_width(value))
+                max_widths[key] = max(max_widths.get(key, 0), str_display_width(str(value)))
 
-        # Print header
         header_line = (
             f"{header_data['stock']:<{max_widths['stock']}}  "
             f"{header_data['name']:<{max_widths['name']}}  "
@@ -474,12 +524,14 @@ def main(args):
             f"{header_data['dividend']:>{max_widths['dividend']}}  "
             f"{header_data['yield']:>{max_widths['yield']}}  "
             f"{header_data['shares']:>{max_widths['shares']}}  "
-            f"{header_data['total_value']:>{max_widths['total_value']}}"
+            f"{header_data['total_value']:>{max_widths['total_value']}}  "
+            f"{header_data['net_pl']:>{max_widths['net_pl']}}  "
+            f"{header_data['percent_pl']:>{max_widths['percent_pl']}}  "
+            f"{header_data['signal']:<{max_widths['signal']}}"
         )
         print(header_line)
         print("-" * str_display_width(header_line))
 
-        # Print data rows (skipping header in data)
         for row in print_data[1:]:
             stock_padding = max_widths['stock'] - str_display_width(row['stock'])
             name_padding = max_widths['name'] - str_display_width(row['name'])
@@ -491,7 +543,10 @@ def main(args):
                 f"{row['dividend']:>{max_widths['dividend']}}  "
                 f"{row['yield']:>{max_widths['yield']}}  "
                 f"{row['shares']:>{max_widths['shares']}}  "
-                f"{row['total_value']:>{max_widths['total_value']}}"
+                f"{row['total_value']:>{max_widths['total_value']}}  "
+                f"{row['net_pl']:>{max_widths['net_pl']}}  "
+                f"{row['percent_pl']:>{max_widths['percent_pl']}}  "
+                f"{row['signal']:<{max_widths['signal']}}"
             )
             print(line)
             
