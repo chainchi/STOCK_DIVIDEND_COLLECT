@@ -1,0 +1,688 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stock Dividend Collector</title>
+    <link
+        href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Inter:wght@300;400;600&display=swap"
+        rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root {
+            --bg-color: #0f111a;
+            --card-bg: #1a1c29;
+            --text-color: #e0e0e0;
+            --accent-color: #64ffda;
+            --secondary-accent: #bd93f9;
+            --command-bg: #000000;
+            --danger-color: #ff5555;
+            --success-color: #50fa7b;
+            --editor-bg: #0d0d0d;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            font-family: 'Inter', sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 95vw;
+            background: rgba(26, 28, 41, 0.7);
+            backdrop-filter: blur(10px);
+            border-radius: 16px;
+            padding: 40px;
+            box-shadow: 0 4px 30px rgba(0, 0, 0, 0.5);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            animation: fadeIn 0.8s ease-out;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        h1 {
+            font-weight: 300;
+            letter-spacing: 2px;
+            margin-bottom: 30px;
+            text-align: center;
+            background: linear-gradient(90deg, var(--accent-color), var(--secondary-accent));
+            background-clip: text;
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .input-group {
+            margin-bottom: 25px;
+            position: relative;
+        }
+
+        input[type="text"],
+        select {
+            width: 100%;
+            padding: 15px 20px;
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid #333;
+            border-radius: 8px;
+            color: var(--accent-color);
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 1rem;
+            outline: none;
+            transition: all 0.3s ease;
+            box-sizing: border-box;
+        }
+
+        input[type="text"]:focus,
+        select:focus {
+            border-color: var(--accent-color);
+            box-shadow: 0 0 15px rgba(100, 255, 218, 0.1);
+        }
+
+        button {
+            width: 100%;
+            padding: 15px;
+            background: linear-gradient(90deg, #1d976c, #93f9b9);
+            border: none;
+            border-radius: 8px;
+            color: #0f111a;
+            font-weight: 600;
+            font-size: 1.1rem;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(29, 151, 108, 0.4);
+        }
+
+        button:disabled {
+            background: #444;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .terminal-window {
+            background: var(--command-bg);
+            border-radius: 8px;
+            border: 1px solid #333;
+            overflow: hidden;
+            box-shadow: inset 0 0 20px rgba(0, 0, 0, 0.8);
+            position: relative;
+        }
+
+        .terminal-header {
+            background: #1a1a1a;
+            padding: 8px 15px;
+            font-size: 0.8rem;
+            color: #666;
+            display: flex;
+            gap: 6px;
+            align-items: center;
+        }
+
+        .dot {
+            height: 10px;
+            width: 10px;
+            border-radius: 50%;
+            display: inline-block;
+        }
+
+        .red {
+            background-color: #ff5f56;
+        }
+
+        .yellow {
+            background-color: #ffbd2e;
+        }
+
+        .green {
+            background-color: #27c93f;
+        }
+
+        .output-content {
+            padding: 20px;
+            font-family: 'Consolas', 'MS Gothic', monospace;
+            font-size: 1rem;
+            white-space: pre;
+            overflow-x: auto;
+            color: #dcdcdc;
+            min-height: 200px;
+            max-height: 600px;
+            overflow-y: auto;
+            line-height: 1.5;
+        }
+
+        .output-content::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        .output-content::-webkit-scrollbar-track {
+            background: #1a1a1a;
+        }
+
+        .output-content::-webkit-scrollbar-thumb {
+            background: #444;
+            border-radius: 4px;
+        }
+
+        .loading-spinner {
+            display: none;
+            margin: 20px auto;
+            width: 40px;
+            height: 40px;
+            border: 3px solid rgba(255, 255, 255, 0.1);
+            border-radius: 50%;
+            border-top-color: var(--accent-color);
+            animation: spin 1s ease-in-out infinite;
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        .footer {
+            margin-top: 20px;
+            font-size: 0.8rem;
+            opacity: 0.5;
+        }
+
+        .tabs {
+            margin-top: 30px;
+            display: flex;
+            gap: 10px;
+        }
+
+        .tab-btn {
+            background: #1a1a1a;
+            border: 1px solid #333;
+            width: auto;
+            padding: 10px 20px;
+            border-radius: 8px 8px 0 0;
+            margin-bottom: 0;
+            color: #888;
+            cursor: pointer;
+        }
+
+        .tab-btn.active {
+            background: var(--command-bg);
+            border-bottom: 1px solid var(--command-bg);
+            color: var(--accent-color);
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        .summary-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+            font-family: 'Inter', sans-serif;
+            font-size: 0.9rem;
+        }
+
+        .summary-table th,
+        .summary-table td {
+            text-align: left;
+            padding: 12px 15px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .summary-table th {
+            background: rgba(100, 255, 218, 0.05);
+            color: var(--accent-color);
+            font-weight: 600;
+            text-transform: uppercase;
+            font-size: 0.8rem;
+            letter-spacing: 1px;
+        }
+
+        .signal-badge {
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            font-weight: 700;
+        }
+
+        .signal-tp {
+            background: rgba(255, 85, 85, 0.1);
+            color: #ff5555;
+            border: 1px solid rgba(255, 85, 85, 0.2);
+        }
+
+        .signal-cl {
+            background: rgba(80, 250, 123, 0.1);
+            color: #50fa7b;
+            border: 1px solid rgba(80, 250, 123, 0.2);
+        }
+
+        .individual-chart-card {
+            background: #1a1c29;
+            border: 1px solid #333;
+            border-radius: 12px;
+            padding: 25px;
+            margin-bottom: 30px;
+        }
+
+        .individual-chart-title {
+            color: var(--accent-color);
+            font-size: 1.1rem;
+            margin-bottom: 15px;
+            text-align: center;
+        }
+
+        .view-toggle-bar {
+            display: flex;
+            justify-content: flex-end;
+            margin-bottom: 20px;
+        }
+
+        .toggle-btn {
+            width: auto;
+            padding: 8px 16px;
+            font-size: 0.8rem;
+            background: #333;
+            color: white;
+            border: 1px solid #444;
+            border-radius: 4px;
+        }
+
+        .toggle-btn.active {
+            background: var(--accent-color);
+            color: #000;
+            border-color: var(--accent-color);
+        }
+
+        /* EDITOR STYLES */
+        .editor-container {
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            background: #1a1c29;
+        }
+
+        .editor-controls {
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        .editor-textarea {
+            width: 100%;
+            height: 500px;
+            background: var(--editor-bg);
+            color: #f0f0f0;
+            font-family: 'JetBrains Mono', 'Consolas', monospace;
+            font-size: 1rem;
+            padding: 20px;
+            border: 1px solid #333;
+            border-radius: 8px;
+            outline: none;
+            resize: vertical;
+            line-height: 1.6;
+        }
+
+        .editor-textarea:focus {
+            border-color: var(--accent-color);
+        }
+
+        .editor-filename-input {
+            flex: 2;
+            min-width: 200px;
+        }
+
+        .editor-path-input {
+            flex: 3;
+            min-width: 300px;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="container">
+        <h1>STOCK DIVIDEND COLLECTOR</h1>
+
+        <div class="input-row" style="display: flex; gap: 20px;">
+            <div class="input-group" style="flex: 1;">
+                <label for="year"
+                    style="display:block; margin-bottom:10px; font-size: 0.9rem; color: #888;">Year</label>
+                <input type="text" id="year" value="2025" spellcheck="false">
+            </div>
+
+            <div class="input-group" style="flex: 3;">
+                <label for="fileInput" style="display:block; margin-bottom:10px; font-size: 0.9rem; color: #888;">Input
+                    File</label>
+                <input type="file" id="fileInput"
+                    style="color:white; padding: 10px; background: rgba(0,0,0,0.3); border-radius: 8px; width: 100%;">
+            </div>
+        </div>
+
+        <div class="input-group">
+            <label for="stockCodes" style="display:block; margin-bottom:10px; font-size: 0.9rem; color: #888;">Or Stock
+                Codes (Leave empty to use File)</label>
+            <input type="text" id="stockCodes" value="" spellcheck="false" placeholder="e.g. 2330.TW 0050.TW">
+        </div>
+
+        <button id="runBtn" onclick="runScript()">EXECUTE COMMAND</button>
+
+        <div class="loading-spinner" id="spinner"></div>
+
+        <div class="tabs">
+            <button class="tab-btn active" onclick="switchTab('console')" id="tab-console">Console Output</button>
+            <button class="tab-btn" onclick="switchTab('editor')" id="tab-editor">File Editor</button>
+            <button class="tab-btn" onclick="switchTab('analysis')" id="tab-analysis">Summary & Analysis</button>
+            <button class="tab-btn" onclick="switchTab('monthly')" id="tab-monthly">Monthly Distribution</button>
+        </div>
+
+        <!-- CONSOLE TAB -->
+        <div id="view-console" class="tab-content active terminal-window" style="border-top-left-radius: 0;">
+            <div class="terminal-header">
+                <span class="dot red"></span><span class="dot yellow"></span><span class="dot green"></span>
+                <span style="margin-left: 10px;">console output</span>
+            </div>
+            <div class="output-content" id="output">Waiting for command...</div>
+        </div>
+
+        <!-- EDITOR TAB -->
+        <div id="view-editor" class="tab-content terminal-window"
+            style="border-top-left-radius: 0; background: #1a1c29;">
+            <div class="terminal-header" style="border-bottom: 1px solid #333;">
+                <span>file management editor</span>
+            </div>
+            <div class="editor-container">
+                <div class="editor-controls">
+                    <input type="file" id="editorOpenInput" style="display:none" accept=".txt"
+                        onchange="handleFileSelect(this)">
+                    <button onclick="document.getElementById('editorOpenInput').click()"
+                        style="width: auto; padding: 10px 20px; background: var(--accent-color); color: #000;">OPEN
+                        FILE...</button>
+                    <div style="flex: 1; display: flex; gap: 10px; align-items: center;">
+                        <span style="font-size: 0.8rem; color: #666;">Save Directory:</span>
+                        <input type="text" id="editorPath" class="editor-path-input"
+                            style="flex: 1; min-width: 100px; padding: 10px;"
+                            placeholder="Folder to save in (e.g. . or C:\data)" value=".">
+                    </div>
+                </div>
+                <div class="editor-controls">
+                    <input type="text" id="editorFilename" class="editor-filename-input"
+                        placeholder="Filename (e.g. watchlist.txt)">
+                    <button onclick="saveFile()"
+                        style="width: auto; padding: 10px 20px; background: var(--secondary-accent); color: #000;">SAVE
+                        FILE</button>
+                    <button onclick="newFile()"
+                        style="width: auto; padding: 10px 20px; background: #444; color: #fff;">NEW</button>
+                </div>
+                <div id="saveStatus" style="font-size: 0.8rem; color: var(--success-color); min-height: 1.2rem;"></div>
+                <textarea id="editorArea" class="editor-textarea" spellcheck="false"
+                    placeholder="Enter stock list data here..."></textarea>
+            </div>
+        </div>
+
+        <!-- ANALYSIS TAB -->
+        <div id="view-analysis" class="tab-content terminal-window"
+            style="border-top-left-radius: 0; padding: 20px; background: #1a1c29;">
+            <div
+                style="overflow-x: auto; margin-bottom: 40px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 20px;">
+                <table class="summary-table" id="summaryTable">
+                    <thead>
+                        <tr>
+                            <th>Stock</th>
+                            <th>Name</th>
+                            <th>Price</th>
+                            <th>Dividend</th>
+                            <th>Yield</th>
+                            <th>Shares</th>
+                            <th>Total Val</th>
+                            <th>Net P/L</th>
+                            <th>P/L %</th>
+                            <th>Signal</th>
+                        </tr>
+                    </thead>
+                    <tbody id="summaryBody">
+                        <tr>
+                            <td colspan="10" style="text-align: center; color: #666; padding: 50px;">Run script to see
+                                summary</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            <div style="height: 500px; position: relative;"><canvas id="dividendChart"></canvas></div>
+        </div>
+
+        <!-- MONTHLY TAB -->
+        <div id="view-monthly" class="tab-content terminal-window"
+            style="border-top-left-radius: 0; padding: 20px; min-height: 500px; background: #0f111a; max-height: 800px; overflow-y: auto;">
+            <div class="view-toggle-bar">
+                <button id="toggleMonthlyBtn" class="toggle-btn" onclick="toggleMonthlyView()">SWITCH TO MIXED
+                    CHART</button>
+            </div>
+            <div id="monthlyChartsContainer">
+                <div style="text-align: center; color: #666; margin-top: 50px;">Run script to see monthly analysis</div>
+            </div>
+            <div id="mixedMonthlyContainer" style="display: none; height: 500px;"><canvas
+                    id="mixedMonthlyChart"></canvas></div>
+        </div>
+    </div>
+
+    <div class="footer">Antigravity Terminal Interface</div>
+
+    <script>
+        let myChart = null, myMonthlyChartInstances = [], myMixedMonthlyChart = null;
+        let lastJsonData = null, currentMonthlyView = 'individual', fullOutputBuffer = "";
+        const CHART_COLORS = ['#64ffda', '#bd93f9', '#ff79c6', '#8be9fd', '#50fa7b', '#ffb86c', '#ff5555', '#f1fa8c', '#a29bfe', '#fd79a8'];
+
+        function switchTab(tab) {
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+            document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+            document.getElementById('view-' + tab).classList.add('active');
+            document.getElementById('tab-' + tab).classList.add('active');
+        }
+
+        async function handleFileSelect(input) {
+            const file = input.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function (e) {
+                document.getElementById('editorArea').value = e.target.result;
+                document.getElementById('editorFilename').value = file.name;
+                // We cannot get the full path for security reasons, so we leave it to user or CWD
+            };
+            reader.readAsText(file);
+            input.value = ""; // Reset
+        }
+
+
+        async function saveFile() {
+            const filename = document.getElementById('editorFilename').value.trim();
+            const path = document.getElementById('editorPath').value.trim();
+            const content = document.getElementById('editorArea').value;
+            const statusDiv = document.getElementById('saveStatus');
+
+            if (!filename) { alert("Please provide a filename"); return; }
+            statusDiv.textContent = "Saving...";
+            statusDiv.style.color = "var(--secondary-accent)";
+
+            try {
+                const res = await fetch('/api/save_txt', {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ filename, path, content })
+                });
+                const data = await res.json();
+                if (data.status === 'success') {
+                    statusDiv.innerHTML = `✓ Saved to: <span style="color:#fff">${data.full_path}</span>`;
+                    statusDiv.style.color = "var(--success-color)";
+                    // Also alert user for visibility
+                    alert(`File saved successfully!\nLocation: ${data.full_path}`);
+                } else {
+                    statusDiv.textContent = "Error: " + data.message;
+                    statusDiv.style.color = "var(--danger-color)";
+                    alert(data.message);
+                }
+            } catch (e) {
+                statusDiv.textContent = "Error: " + e;
+                statusDiv.style.color = "var(--danger-color)";
+                alert("Error saving file: " + e);
+            }
+        }
+
+        function newFile() {
+            document.getElementById('editorArea').value = "";
+            document.getElementById('editorFilename').value = "";
+        }
+
+        function toggleMonthlyView() {
+            const btn = document.getElementById('toggleMonthlyBtn');
+            const indCon = document.getElementById('monthlyChartsContainer'), mixCon = document.getElementById('mixedMonthlyContainer');
+            if (currentMonthlyView === 'individual') {
+                currentMonthlyView = 'mixed'; btn.textContent = "SWITCH TO INDIVIDUAL CHARTS";
+                indCon.style.display = "none"; mixCon.style.display = "block";
+                if (lastJsonData) renderMixedMonthlyChart(lastJsonData);
+            } else {
+                currentMonthlyView = 'individual'; btn.textContent = "SWITCH TO MIXED CHART";
+                indCon.style.display = "block"; mixCon.style.display = "none";
+                if (lastJsonData) renderMonthlyCharts(lastJsonData);
+            }
+        }
+
+        function renderSummaryTable(data) {
+            const body = document.getElementById('summaryBody'); body.innerHTML = "";
+            data.forEach(item => {
+                const tr = document.createElement('tr');
+                const signalClass = item.signal === 'Take-Profit' ? 'signal-tp' : (item.signal === 'Cut-Loss' ? 'signal-cl' : '');
+                const signalSpan = item.signal ? `<span class="signal-badge ${signalClass}">${item.signal}</span>` : "";
+                tr.innerHTML = `
+                    <td>${item.stock}</td><td>${item.name}</td><td>${item.price.toFixed(2)}</td>
+                    <td style="color: var(--accent-color)">${item.dividend.toFixed(2)}</td><td>${item.yield.toFixed(2)}%</td>
+                    <td>${item.shares || '-'}</td><td>${item.total_value ? item.total_value.toLocaleString(undefined, { minimumFractionDigits: 2 }) : '-'}</td>
+                    <td style="color: ${item.net_pl >= 0 ? '#ff5555' : '#50fa7b'}">${item.net_pl ? item.net_pl.toLocaleString(undefined, { minimumFractionDigits: 2 }) : '-'}</td>
+                    <td style="color: ${item.percent_pl >= 0 ? '#ff5555' : '#50fa7b'}">${item.percent_pl ? item.percent_pl.toFixed(2) + '%' : '-'}</td><td>${signalSpan}</td>`;
+                body.appendChild(tr);
+            });
+        }
+
+        function renderChart(data) {
+            const ctx = document.getElementById('dividendChart').getContext('2d');
+            if (myChart) myChart.destroy();
+            data.sort((a, b) => b.dividend - a.dividend);
+            myChart = new Chart(ctx, {
+                type: 'bar', data: {
+                    labels: data.map(item => `${item.stock} ${item.name}`),
+                    datasets: [
+                        { label: 'Total Dividend', data: data.map(item => item.dividend), backgroundColor: 'rgba(100, 255, 218, 0.6)', borderColor: 'rgba(100, 255, 218, 1)', borderWidth: 1, yAxisID: 'y' },
+                        { label: 'Yield (%)', data: data.map(item => item.yield), backgroundColor: 'rgba(189, 147, 249, 0.6)', borderColor: 'rgba(189, 147, 249, 1)', borderWidth: 1, type: 'line', yAxisID: 'y1' }
+                    ]
+                },
+                options: { responsive: true, maintainAspectRatio: false, scales: { y: { type: 'linear', display: true, position: 'left', grid: { color: 'rgba(255,255,255,0.1)' }, ticks: { color: '#ccc' } }, y1: { type: 'linear', display: true, position: 'right', grid: { drawOnChartArea: false }, ticks: { color: '#bd93f9' } }, x: { ticks: { color: '#ccc' } } }, plugins: { legend: { labels: { color: '#fff' } } } }
+            });
+        }
+
+        function renderMixedMonthlyChart(data) {
+            const ctx = document.getElementById('mixedMonthlyChart').getContext('2d');
+            if (myMixedMonthlyChart) myMixedMonthlyChart.destroy();
+            const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+            const datasets = data.map((stockItem, index) => {
+                const monthlyData = new Array(12).fill(0);
+                if (stockItem.events) stockItem.events.forEach(event => {
+                    const m = parseInt(event.Date.split('-')[1]) - 1; if (m >= 0 && m < 12) monthlyData[m] += event.Amount;
+                });
+                return { label: `${stockItem.stock} ${stockItem.name}`, data: monthlyData, backgroundColor: CHART_COLORS[index % CHART_COLORS.length], stack: 'Stack 0' };
+            }).filter(ds => ds.data.some(v => v > 0));
+            myMixedMonthlyChart = new Chart(ctx, {
+                type: 'bar', data: { labels: months, datasets: datasets },
+                options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, scales: { x: { stacked: true, ticks: { color: '#ccc' } }, y: { stacked: true, beginAtZero: true, grid: { color: 'rgba(255,255,255,0.1)' }, ticks: { color: '#ccc' } } }, plugins: { legend: { labels: { color: '#fff' }, position: 'bottom' } } }
+            });
+        }
+
+        function renderMonthlyCharts(data) {
+            const container = document.getElementById('monthlyChartsContainer'); container.innerHTML = ""; myMonthlyChartInstances.forEach(c => c.destroy()); myMonthlyChartInstances = [];
+            const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+            data.forEach((stockItem, index) => {
+                if (!stockItem.events || stockItem.events.length === 0) return;
+                const monthlyData = new Array(12).fill(0); stockItem.events.forEach(event => {
+                    const m = parseInt(event.Date.split('-')[1]) - 1; if (m >= 0 && m < 12) monthlyData[m] += event.Amount;
+                });
+                if (monthlyData.every(v => v === 0)) return;
+                const card = document.createElement('div'); card.className = "individual-chart-card";
+                card.innerHTML = `<div class="individual-chart-title">${stockItem.stock} ${stockItem.name}</div><div style="height:300px;position:relative;"><canvas></canvas></div>`;
+                container.appendChild(card);
+                const chart = new Chart(card.querySelector('canvas'), {
+                    type: 'bar', data: { labels: months, datasets: [{ label: 'Dividends', data: monthlyData, backgroundColor: CHART_COLORS[index % CHART_COLORS.length], borderWidth: 1 }] },
+                    options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true, grid: { color: 'rgba(255,255,255,0.1)' }, ticks: { color: '#ccc' } }, x: { ticks: { color: '#ccc' } } }, plugins: { legend: { display: false } } }
+                });
+                myMonthlyChartInstances.push(chart);
+            });
+        }
+
+        async function runScript() {
+            const btn = document.getElementById('runBtn'), output = document.getElementById('output'), spinner = document.getElementById('spinner');
+            const year = document.getElementById('year').value, fileInput = document.getElementById('fileInput'), stockCodes = document.getElementById('stockCodes').value.trim();
+            let filePath = ""; fullOutputBuffer = "";
+            btn.disabled = true; btn.textContent = "UPLOADING..."; output.textContent = ""; spinner.style.display = "block";
+            try {
+                if (!stockCodes && fileInput.files.length > 0) {
+                    const formData = new FormData(); formData.append('file', fileInput.files[0]);
+                    const uploadRes = await fetch('/upload', { method: 'POST', body: formData });
+                    const uploadData = await uploadRes.json();
+                    if (uploadData.status === 'success') filePath = uploadData.filepath; else throw new Error(uploadData.message);
+                } else if (!stockCodes && fileInput.files.length === 0) {
+                    if (!confirm("No file selected. Run default?")) throw new Error("Cancelled");
+                    filePath = "stock_list_larence_jessica_wiht_buyinprice_threshold.txt";
+                }
+                btn.textContent = "RUNNING...";
+                let args = `-y ${year}` + (stockCodes ? ` -s ${stockCodes}` : ` -i ${filePath}`);
+                output.textContent += `Executing: ${args}\n------------------\n`;
+                const response = await fetch('/run', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ args }) });
+                const reader = response.body.getReader(), decoder = new TextDecoder();
+                while (true) {
+                    const { done, value } = await reader.read(); if (done) break;
+                    const text = decoder.decode(value, { stream: true }); fullOutputBuffer += text;
+                    const jStart = fullOutputBuffer.indexOf('---JSON_START---'), jEnd = fullOutputBuffer.indexOf('---JSON_END---');
+                    if (jStart !== -1) {
+                        output.textContent = fullOutputBuffer.substring(0, jStart);
+                        if (jEnd !== -1) {
+                            try {
+                                lastJsonData = JSON.parse(fullOutputBuffer.substring(jStart + 16, jEnd));
+                                renderSummaryTable(lastJsonData); renderChart(lastJsonData);
+                                if (currentMonthlyView === 'individual') renderMonthlyCharts(lastJsonData); else renderMixedMonthlyChart(lastJsonData);
+                            } catch (e) { console.error("JSON Error", e); }
+                        }
+                    } else output.textContent = fullOutputBuffer;
+                    output.scrollTop = output.scrollHeight;
+                }
+            } catch (err) { output.textContent += "\nError: " + err; output.style.color = "#ff5f56"; }
+            finally { btn.disabled = false; btn.textContent = "EXECUTE COMMAND"; spinner.style.display = "none"; }
+        }
+    </script>
+</body>
+
+</html>

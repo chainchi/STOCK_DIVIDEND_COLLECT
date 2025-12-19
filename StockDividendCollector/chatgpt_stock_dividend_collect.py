@@ -175,7 +175,7 @@ def generate_yield_chart(summary, year):
     
     chart_data = {}
     max_yield = 0.0
-    for stock, (total, name, price, price_date, shares, price_change, _, _, _) in summary.items(): # Added placeholders
+    for stock, (total, name, price, price_date, shares, price_change, _, _, _, _) in summary.items(): # Added placeholders
         yield_val = 0.0
         if total > 0 and price is not None and price > 0:
             yield_val = (total / price) * 100
@@ -227,7 +227,7 @@ def generate_combined_performance_chart(summary, year):
                  
     chart_data = {}
     max_combined_performance = 0.0
-    for stock, (total, name, price, price_date, shares, price_change, _, _, _) in summary.items(): # Added placeholders
+    for stock, (total, name, price, price_date, shares, price_change, _, _, _, _) in summary.items(): # Added placeholders
         yield_val = 0.0
         if total > 0 and price is not None and price > 0:
             yield_val = (total / price) * 100
@@ -285,7 +285,7 @@ def generate_subtracted_performance_chart(summary, year):
                   
     chart_data = {}
     max_subtracted_performance = 0.0
-    for stock, (total, name, price, price_date, shares, price_change, _, _, _) in summary.items(): # Added placeholders
+    for stock, (total, name, price, price_date, shares, price_change, _, _, _, _) in summary.items(): # Added placeholders
         yield_val = 0.0
         if total > 0 and price is not None and price > 0:
             yield_val = (total / price) * 100
@@ -447,7 +447,7 @@ def main(args):
         price, price_date = get_latest_price_yahoo(stock_code)
         price_change = get_price_change_yahoo(stock_code, year)
         
-        summary[stock_code] = (total, chinese_name, price, price_date, shares, price_change, bought_price, low_rate_threshold, high_rate_threshold)
+        summary[stock_code] = (total, chinese_name, price, price_date, shares, price_change, bought_price, low_rate_threshold, high_rate_threshold, dividends)
 
         if dividends:
             print(f"\nDividend info for stock {stock_code} ({chinese_name}) in {year}:")
@@ -459,7 +459,8 @@ def main(args):
         print(f"\n=== Dividend Summary ({year}) ===")
                     
         price_header_date = ""
-        for _, _, _, p_date, _, _, _, _, _ in summary.values():
+        # Update unpacking to ignore the new last element (dividends)
+        for _, _, _, p_date, _, _, _, _, _, _ in summary.values():
             if p_date and p_date != "N/A":
                 price_header_date = p_date
                 break
@@ -476,7 +477,7 @@ def main(args):
         
         max_widths = {key: str_display_width(value) for key, value in header_data.items()}
 
-        for stock, (total, name, price, price_date, shares, price_change, bought_price, low_rate_threshold, high_rate_threshold) in summary.items():
+        for stock, (total, name, price, price_date, shares, price_change, bought_price, low_rate_threshold, high_rate_threshold, dividends_list) in summary.items():
             price_str = f"{price:.2f}" if price is not None else "N/A"
             dividend_str = f"{total:.2f}"
             yield_str = "N/A"
@@ -555,6 +556,55 @@ def main(args):
         generate_yield_chart(summary, year)
         generate_combined_performance_chart(summary, year)
         generate_subtracted_performance_chart(summary, year)
+        
+        # --- JSON Output for Web Interface ---
+        import json
+        json_data = []
+        for stock, vals in summary.items():
+            # vals = (total, name, price, price_date, shares, price_change, bought_price, low, high, dividends)
+            total, name, price, p_date, shares, p_change, b_price, low_t, high_t, dividends_list = vals
+            
+            yield_val = 0.0
+            if total > 0 and price is not None and price > 0:
+                yield_val = (total / price) * 100
+
+            total_value = 0.0
+            if total > 0 and shares is not None:
+                total_value = total * shares
+
+            net_pl = 0.0
+            percent_pl = 0.0
+            if b_price is not None and price is not None and shares is not None:
+                net_pl = (price - b_price) * shares
+                if b_price > 0:
+                    percent_pl = ((price - b_price) / b_price) * 100
+            
+            signal = ""
+            if b_price is not None and price is not None:
+                current_pl_p = percent_pl
+                if high_t is not None and current_pl_p >= high_t:
+                    signal = "Take-Profit"
+                elif low_t is not None and current_pl_p <= low_t:
+                    signal = "Cut-Loss"
+            
+            json_data.append({
+                "stock": stock,
+                "name": name,
+                "dividend": total,
+                "yield": yield_val,
+                "price": price if price else 0,
+                "price_date": p_date,
+                "shares": shares if shares else 0,
+                "total_value": total_value,
+                "net_pl": net_pl,
+                "percent_pl": percent_pl,
+                "signal": signal,
+                "events": dividends_list # [{Date, Amount}, ...]
+            })
+            
+        print("\n---JSON_START---")
+        print(json.dumps(json_data))
+        print("---JSON_END---")
     # --- End of new summary printing logic ---
 
 if __name__ == "__main__":
