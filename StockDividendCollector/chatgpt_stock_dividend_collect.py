@@ -569,8 +569,8 @@ def main(args):
                 yield_val = (total / price) * 100
 
             total_value = 0.0
-            if total > 0 and shares is not None:
-                total_value = total * shares
+            if price is not None and shares is not None:
+                total_value = price * shares
 
             net_pl = 0.0
             percent_pl = 0.0
@@ -587,19 +587,28 @@ def main(args):
                 elif low_t is not None and current_pl_p <= low_t:
                     signal = "Cut-Loss"
             
+            s_count = shares if shares else 0
+            # Adjust dividend events to reflect real total profit (Amount * shares)
+            adjusted_events = []
+            for ev in dividends_list:
+                adjusted_events.append({
+                    "Date": ev["Date"],
+                    "Amount": ev["Amount"] * s_count
+                })
+
             json_data.append({
                 "stock": stock,
                 "name": name,
-                "dividend": total,
+                "dividend": total,  # Dividend per share only
                 "yield": yield_val,
                 "price": price if price else 0,
                 "price_date": p_date,
-                "shares": shares if shares else 0,
+                "shares": s_count,
                 "total_value": total_value,
                 "net_pl": net_pl,
                 "percent_pl": percent_pl,
                 "signal": signal,
-                "events": dividends_list # [{Date, Amount}, ...]
+                "events": adjusted_events
             })
             
         print("\n---JSON_START---")

@@ -398,9 +398,9 @@
 
         <div class="tabs">
             <button class="tab-btn active" onclick="switchTab('console')" id="tab-console">Console Output</button>
-            <button class="tab-btn" onclick="switchTab('editor')" id="tab-editor">File Editor</button>
             <button class="tab-btn" onclick="switchTab('analysis')" id="tab-analysis">Summary & Analysis</button>
             <button class="tab-btn" onclick="switchTab('monthly')" id="tab-monthly">Monthly Distribution</button>
+            <button class="tab-btn" onclick="switchTab('editor')" id="tab-editor">File Editor</button>
         </div>
 
         <!-- CONSOLE TAB -->
@@ -619,7 +619,57 @@
             }).filter(ds => ds.data.some(v => v > 0));
             myMixedMonthlyChart = new Chart(ctx, {
                 type: 'bar', data: { labels: months, datasets: datasets },
-                options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, scales: { x: { stacked: true, ticks: { color: '#ccc' } }, y: { stacked: true, beginAtZero: true, grid: { color: 'rgba(255,255,255,0.1)' }, ticks: { color: '#ccc' } } }, plugins: { legend: { labels: { color: '#fff' }, position: 'bottom' } } }
+                plugins: [{
+                    id: 'stackedTotals',
+                    afterDatasetsDraw(chart) {
+                        const { ctx, scales: { x, y } } = chart;
+                        ctx.save();
+                        ctx.font = 'bold 11px JetBrains Mono';
+                        ctx.fillStyle = '#64ffda';
+                        ctx.textAlign = 'center';
+                        ctx.textBaseline = 'bottom';
+
+                        chart.data.labels.forEach((label, i) => {
+                            let total = 0;
+                            chart.data.datasets.forEach(dataset => {
+                                total += dataset.data[i] || 0;
+                            });
+                            if (total > 0) {
+                                const xPos = x.getPixelForValue(i);
+                                const yPos = y.getPixelForValue(total);
+                                ctx.fillText(total.toLocaleString(undefined, { maximumFractionDigits: 0 }), xPos, yPos - 5);
+                            }
+                        });
+                        ctx.restore();
+                    }
+                }],
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: { mode: 'index', intersect: false },
+                    scales: {
+                        x: { stacked: true, ticks: { color: '#ccc' } },
+                        y: { stacked: true, beginAtZero: true, grid: { color: 'rgba(255,255,255,0.1)' }, ticks: { color: '#ccc' } }
+                    },
+                    plugins: {
+                        legend: { labels: { color: '#fff' }, position: 'bottom' },
+                        tooltip: {
+                            filter: function (tooltipItem) {
+                                return tooltipItem.raw > 0;
+                            },
+                            callbacks: {
+                                label: function (context) {
+                                    let label = context.dataset.label || '';
+                                    if (label) label += ': ';
+                                    if (context.parsed.y !== null) {
+                                        label += Math.round(context.parsed.y).toLocaleString();
+                                    }
+                                    return label;
+                                }
+                            }
+                        }
+                    }
+                }
             });
         }
 
@@ -637,7 +687,28 @@
                 container.appendChild(card);
                 const chart = new Chart(card.querySelector('canvas'), {
                     type: 'bar', data: { labels: months, datasets: [{ label: 'Dividends', data: monthlyData, backgroundColor: CHART_COLORS[index % CHART_COLORS.length], borderWidth: 1 }] },
-                    options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true, grid: { color: 'rgba(255,255,255,0.1)' }, ticks: { color: '#ccc' } }, x: { ticks: { color: '#ccc' } } }, plugins: { legend: { display: false } } }
+                    options: {
+                        responsive: true, maintainAspectRatio: false,
+                        scales: {
+                            y: { beginAtZero: true, grid: { color: 'rgba(255,255,255,0.1)' }, ticks: { color: '#ccc' } },
+                            x: { ticks: { color: '#ccc' } }
+                        },
+                        plugins: {
+                            legend: { display: false },
+                            tooltip: {
+                                callbacks: {
+                                    label: function (context) {
+                                        let label = context.dataset.label || '';
+                                        if (label) label += ': ';
+                                        if (context.parsed.y !== null) {
+                                            label += Math.round(context.parsed.y).toLocaleString();
+                                        }
+                                        return label;
+                                    }
+                                }
+                            }
+                        }
+                    }
                 });
                 myMonthlyChartInstances.push(chart);
             });
