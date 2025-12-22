@@ -73,73 +73,9 @@ def upload_file():
         file.save(filepath)
         return jsonify({"status": "success", "filepath": os.path.abspath(filepath)})
 
-# --- NEW EDITOR API ENDPOINTS ---
-
-@app.route('/api/list_txt', methods=['POST']) # Changed to POST to receive path
-def list_txt_files():
-    data = request.json or {}
-    path = data.get('path', '.')
-    if not path: path = '.'
-    
-    try:
-        if not os.path.exists(path):
-            return jsonify({"status": "error", "message": "Path does not exist"}), 404
-        
-        files = [f for f in os.listdir(path) if f.endswith('.txt')]
-        return jsonify({
-            "status": "success", 
-            "files": sorted(files),
-            "abs_path": os.path.abspath(path)
-        })
-    except Exception as e:
-        return jsonify({"status": "error", "message": str(e)}), 500
-
-@app.route('/api/read_txt', methods=['POST'])
-def read_txt_file():
-    data = request.json
-    filename = data.get('filename')
-    path = data.get('path', '.')
-    
-    if not filename:
-        return jsonify({"status": "error", "message": "No filename provided"}), 400
-        
-    full_path = os.path.join(path, filename)
-    
-    try:
-        with open(full_path, 'r', encoding='utf-8') as f:
-            content = f.read()
-        return jsonify({"status": "success", "content": content})
-    except Exception as e:
-        return jsonify({"status": "error", "message": str(e)}), 500
-
-@app.route('/api/save_txt', methods=['POST'])
-def save_txt_file():
-    data = request.json
-    filename = data.get('filename')
-    path = data.get('path', '.')
-    content = data.get('content', '')
-    
-    if not filename:
-        return jsonify({"status": "error", "message": "No filename provided"}), 400
-        
-    try:
-        # Ensure we have a clean absolute path
-        target_dir = os.path.abspath(path)
-        full_path = os.path.join(target_dir, filename)
-        
-        # Create directory if it doesn't exist
-        os.makedirs(os.path.dirname(full_path), exist_ok=True)
-        
-        with open(full_path, 'w', encoding='utf-8') as f:
-            f.write(content)
-            
-        return jsonify({
-            "status": "success", 
-            "message": f"Saved successfully!",
-            "full_path": os.path.abspath(full_path)
-        })
-    except Exception as e:
-        return jsonify({"status": "error", "message": str(e)}), 500
+# --- NEW EDITOR API ENDPOINTS REMOVED (Replaced by Browser Downloads) ---
 
 if __name__ == '__main__':
-    app.run(debug=True, host='0.0.0.0', port=5000)
+    # Get port from environment variable for Cloud Run
+    port = int(os.environ.get("PORT", 5000))
+    app.run(debug=True, host='0.0.0.0', port=port)

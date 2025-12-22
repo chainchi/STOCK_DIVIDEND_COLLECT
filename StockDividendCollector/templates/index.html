@@ -162,7 +162,7 @@
         .output-content {
             padding: 20px;
             font-family: 'Consolas', 'MS Gothic', monospace;
-            font-size: 1rem;
+            font-size: 0.85rem;
             white-space: pre;
             overflow-x: auto;
             color: #dcdcdc;
@@ -363,6 +363,58 @@
             flex: 3;
             min-width: 300px;
         }
+
+        /* Toggle Switch Styles */
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 40px;
+            height: 20px;
+        }
+
+        .switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #333;
+            transition: .4s;
+        }
+
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 14px;
+            width: 14px;
+            left: 3px;
+            bottom: 3px;
+            background-color: white;
+            transition: .4s;
+        }
+
+        input:checked+.slider {
+            background-color: var(--accent-color);
+        }
+
+        input:checked+.slider:before {
+            transform: translateX(20px);
+        }
+
+        .slider.round {
+            border-radius: 20px;
+        }
+
+        .slider.round:before {
+            border-radius: 50%;
+        }
     </style>
 </head>
 
@@ -390,6 +442,14 @@
             <label for="stockCodes" style="display:block; margin-bottom:10px; font-size: 0.9rem; color: #888;">Or Stock
                 Codes (Leave empty to use File)</label>
             <input type="text" id="stockCodes" value="" spellcheck="false" placeholder="e.g. 2330.TW 0050.TW">
+        </div>
+
+        <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 20px;">
+            <label class="switch">
+                <input type="checkbox" id="showConsoleCheck" checked onchange="toggleConsoleVisibility()">
+                <span class="slider round"></span>
+            </label>
+            <span style="font-size: 0.9rem; color: #888;">Show Console Output (Processing Details)</span>
         </div>
 
         <button id="runBtn" onclick="runScript()">EXECUTE COMMAND</button>
@@ -425,23 +485,15 @@
                     <button onclick="document.getElementById('editorOpenInput').click()"
                         style="width: auto; padding: 10px 20px; background: var(--accent-color); color: #000;">OPEN
                         FILE...</button>
-                    <div style="flex: 1; display: flex; gap: 10px; align-items: center;">
-                        <span style="font-size: 0.8rem; color: #666;">Save Directory:</span>
-                        <input type="text" id="editorPath" class="editor-path-input"
-                            style="flex: 1; min-width: 100px; padding: 10px;"
-                            placeholder="Folder to save in (e.g. . or C:\data)" value=".">
-                    </div>
                 </div>
                 <div class="editor-controls">
                     <input type="text" id="editorFilename" class="editor-filename-input"
                         placeholder="Filename (e.g. watchlist.txt)">
-                    <button onclick="saveFile()"
-                        style="width: auto; padding: 10px 20px; background: var(--secondary-accent); color: #000;">SAVE
-                        FILE</button>
+                    <button onclick="downloadFile()"
+                        style="width: auto; padding: 10px 20px; background: #64ffda; color: #000;">DOWNLOAD</button>
                     <button onclick="newFile()"
                         style="width: auto; padding: 10px 20px; background: #444; color: #fff;">NEW</button>
                 </div>
-                <div id="saveStatus" style="font-size: 0.8rem; color: var(--success-color); min-height: 1.2rem;"></div>
                 <textarea id="editorArea" class="editor-textarea" spellcheck="false"
                     placeholder="Enter stock list data here..."></textarea>
             </div>
@@ -507,6 +559,22 @@
             document.getElementById('tab-' + tab).classList.add('active');
         }
 
+        function toggleConsoleVisibility() {
+            const isChecked = document.getElementById('showConsoleCheck').checked;
+            const tabBtn = document.getElementById('tab-console');
+            const consoleView = document.getElementById('view-console');
+
+            if (isChecked) {
+                tabBtn.style.display = "block";
+            } else {
+                tabBtn.style.display = "none";
+                // If console was active, switch to analysis tab
+                if (tabBtn.classList.contains('active')) {
+                    switchTab('analysis');
+                }
+            }
+        }
+
         async function handleFileSelect(input) {
             const file = input.files[0];
             if (!file) return;
@@ -522,37 +590,19 @@
         }
 
 
-        async function saveFile() {
-            const filename = document.getElementById('editorFilename').value.trim();
-            const path = document.getElementById('editorPath').value.trim();
+        function downloadFile() {
+            const filename = document.getElementById('editorFilename').value.trim() || 'stock_list.txt';
             const content = document.getElementById('editorArea').value;
-            const statusDiv = document.getElementById('saveStatus');
 
-            if (!filename) { alert("Please provide a filename"); return; }
-            statusDiv.textContent = "Saving...";
-            statusDiv.style.color = "var(--secondary-accent)";
-
-            try {
-                const res = await fetch('/api/save_txt', {
-                    method: 'POST', headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ filename, path, content })
-                });
-                const data = await res.json();
-                if (data.status === 'success') {
-                    statusDiv.innerHTML = `✓ Saved to: <span style="color:#fff">${data.full_path}</span>`;
-                    statusDiv.style.color = "var(--success-color)";
-                    // Also alert user for visibility
-                    alert(`File saved successfully!\nLocation: ${data.full_path}`);
-                } else {
-                    statusDiv.textContent = "Error: " + data.message;
-                    statusDiv.style.color = "var(--danger-color)";
-                    alert(data.message);
-                }
-            } catch (e) {
-                statusDiv.textContent = "Error: " + e;
-                statusDiv.style.color = "var(--danger-color)";
-                alert("Error saving file: " + e);
-            }
+            const blob = new Blob([content], { type: 'text/plain' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+            document.body.removeChild(a);
         }
 
         function newFile() {
@@ -714,11 +764,16 @@
             });
         }
 
+        function updateOutput(text) {
+            const escaped = text.replace(/[&<>"']/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m]));
+            output.innerHTML = escaped.replace(/(Processing\s+[^\n\r]+)/g, '<span style="color: var(--danger-color); font-weight: bold;">$1</span>');
+        }
+
         async function runScript() {
             const btn = document.getElementById('runBtn'), output = document.getElementById('output'), spinner = document.getElementById('spinner');
             const year = document.getElementById('year').value, fileInput = document.getElementById('fileInput'), stockCodes = document.getElementById('stockCodes').value.trim();
             let filePath = ""; fullOutputBuffer = "";
-            btn.disabled = true; btn.textContent = "UPLOADING..."; output.textContent = ""; spinner.style.display = "block";
+            btn.disabled = true; btn.textContent = "UPLOADING..."; output.innerHTML = ""; spinner.style.display = "block";
             try {
                 if (!stockCodes && fileInput.files.length > 0) {
                     const formData = new FormData(); formData.append('file', fileInput.files[0]);
@@ -731,15 +786,18 @@
                 }
                 btn.textContent = "RUNNING...";
                 let args = `-y ${year}` + (stockCodes ? ` -s ${stockCodes}` : ` -i ${filePath}`);
-                output.textContent += `Executing: ${args}\n------------------\n`;
+                fullOutputBuffer = `Executing: ${args}\n------------------\n`;
+                updateOutput(fullOutputBuffer);
+
                 const response = await fetch('/run', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ args }) });
                 const reader = response.body.getReader(), decoder = new TextDecoder();
                 while (true) {
                     const { done, value } = await reader.read(); if (done) break;
                     const text = decoder.decode(value, { stream: true }); fullOutputBuffer += text;
                     const jStart = fullOutputBuffer.indexOf('---JSON_START---'), jEnd = fullOutputBuffer.indexOf('---JSON_END---');
+
                     if (jStart !== -1) {
-                        output.textContent = fullOutputBuffer.substring(0, jStart);
+                        updateOutput(fullOutputBuffer.substring(0, jStart));
                         if (jEnd !== -1) {
                             try {
                                 lastJsonData = JSON.parse(fullOutputBuffer.substring(jStart + 16, jEnd));
@@ -747,10 +805,14 @@
                                 if (currentMonthlyView === 'individual') renderMonthlyCharts(lastJsonData); else renderMixedMonthlyChart(lastJsonData);
                             } catch (e) { console.error("JSON Error", e); }
                         }
-                    } else output.textContent = fullOutputBuffer;
+                    } else {
+                        updateOutput(fullOutputBuffer);
+                    }
                     output.scrollTop = output.scrollHeight;
                 }
-            } catch (err) { output.textContent += "\nError: " + err; output.style.color = "#ff5f56"; }
+            } catch (err) {
+                output.innerHTML += "\n<span style='color: var(--danger-color)'>Error: " + err + "</span>";
+            }
             finally { btn.disabled = false; btn.textContent = "EXECUTE COMMAND"; spinner.style.display = "none"; }
         }
     </script>
