@@ -15,7 +15,7 @@
             --card-bg: #1a1c29;
             --text-color: #e0e0e0;
             --accent-color: #64ffda;
-            --secondary-accent: #bd93f9;
+            --secondary-accent: #00bfa5;
             --command-bg: #000000;
             --danger-color: #ff5555;
             --success-color: #50fa7b;
@@ -98,7 +98,7 @@
         button {
             width: 100%;
             padding: 15px;
-            background: linear-gradient(90deg, #1d976c, #93f9b9);
+            background: linear-gradient(90deg, #64ffda, #00bfa5);
             border: none;
             border-radius: 8px;
             color: #0f111a;
@@ -112,7 +112,7 @@
 
         button:hover {
             transform: translateY(-2px);
-            box-shadow: 0 5px 15px rgba(29, 151, 108, 0.4);
+            box-shadow: 0 5px 15px rgba(255, 121, 198, 0.4);
         }
 
         button:disabled {
@@ -490,7 +490,7 @@
                     <input type="text" id="editorFilename" class="editor-filename-input"
                         placeholder="Filename (e.g. watchlist.txt)">
                     <button onclick="downloadFile()"
-                        style="width: auto; padding: 10px 20px; background: #64ffda; color: #000;">DOWNLOAD</button>
+                        style="width: auto; padding: 10px 20px; background: var(--accent-color); color: #000;">DOWNLOAD</button>
                     <button onclick="newFile()"
                         style="width: auto; padding: 10px 20px; background: #444; color: #fff;">NEW</button>
                 </div>
